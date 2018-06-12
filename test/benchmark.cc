@@ -97,6 +97,7 @@ double time_for_gemms(GemmContext* context, const std::vector<gemm_t>& gemms) {
       MakeConstant(&rhs[k], 0);
       result[k].Resize(gemms[j].rows, gemms[j].cols);
       MakeConstant(&result[k], 0);
+      //std::cout << "SIZES " << gemms[j].rows << gemms[j].depth <<  gemms[j].cols << std::endl;
     }
   }
 
@@ -105,15 +106,19 @@ double time_for_gemms(GemmContext* context, const std::vector<gemm_t>& gemms) {
   int iters_at_a_time = 1;
   float time_per_iter = 0.0f;
   std::size_t pool_index = 0;
+  const auto& pipeline = MakeStandardOutputPipeline(74980, 123, 20);
 
   while (true) {
     double starttime = real_time_in_seconds();
     for (int i = 0; i < iters_at_a_time; i++) {
       for (size_t j = 0; j < gemms.size(); j++) {
         size_t k = pool_index * gemms.size() + j;
-        Gemm<std::uint8_t, GEMMLOWP_TEST_BIT_DEPTH_PARAMS>(
-            context, lhs[k].const_map(), rhs[k].const_map(), &result[k].map(),
-            -75, -91, 74980, 123, 20);
+        //Gemm<std::uint8_t, GEMMLOWP_TEST_BIT_DEPTH_PARAMS>(
+        //   context, lhs[k].const_map(), rhs[k].const_map(), &result[k].map(),
+        //    -75, -91, 74980, 123, 20);
+        GemmWithOutputPipeline<std::uint8_t, std::uint8_t, GEMMLOWP_TEST_BIT_DEPTH_PARAMS>(
+           context, lhs[k].const_map(), rhs[k].const_map(), &result[k].map(),
+            -75, -91, pipeline);
       }
       pool_index++;
       if (pool_index == pool_size) {
@@ -213,6 +218,7 @@ void benchmark(GemmContext* context) {
 void benchmark_gemm_sizes(GemmContext* context,
                           const std::vector<gemm_t>& gemms, double mintime) {
   typedef Matrix<std::uint8_t, MapOrder::RowMajor> LhsType;
+  //typedef Matrix<std::uint8_t, MapOrder::ColMajor> LhsType;
   typedef Matrix<std::uint8_t, MapOrder::ColMajor> RhsType;
   typedef Matrix<std::uint8_t, MapOrder::ColMajor> ResultType;
 
@@ -220,6 +226,7 @@ void benchmark_gemm_sizes(GemmContext* context,
   std::cout << "running for " << mintime << " seconds..." << std::endl;
 
 #ifdef GEMMLOWP_TEST_PROFILE
+  std::cout << "PROFILING" << std::endl;
   gemmlowp::RegisterCurrentThreadForProfiling();
   gemmlowp::StartProfiling();
 #endif
@@ -334,10 +341,43 @@ void benchmark_small_model(GemmContext* context) {
   benchmark_gemm_sizes(context, small_model_gemms, mintime);
 }
 
+void benchmark_nmt_model(GemmContext* context) {
+  // These are the m, n, k sizes for a small model with large batches.
+  const int small_model_gemm_sizes[] = {
+      31690, 144, 2048
+  };
+  //const int small_model_gemm_sizes[] = {
+  //    512, 12, 1024
+  //};
+  assert(sizeof(small_model_gemm_sizes) %
+             (3 * sizeof(small_model_gemm_sizes[0])) ==
+         0);
+  const std::size_t num_small_model_gemms =
+      sizeof(small_model_gemm_sizes) / (3 * sizeof(small_model_gemm_sizes[0]));
+
+  std::vector<gemm_t> small_model_gemms(num_small_model_gemms);
+  for (std::size_t i = 0; i < num_small_model_gemms; i++) {
+    small_model_gemms[i].rows = small_model_gemm_sizes[3 * i + 1];
+    small_model_gemms[i].depth = small_model_gemm_sizes[3 * i + 2];
+    small_model_gemms[i].cols = small_model_gemm_sizes[3 * i + 0];
+  }
+
+  const double mintime = 10.0;
+  benchmark_gemm_sizes(context, small_model_gemms, mintime);
+}
+
 void benchmark_all() {
   {
     gemmlowp::GemmContext context;
+    context.set_max_num_threads(32);
+    std::cout << "Benchmarking nmt model GEMMs..." << std::endl;
+    gemmlowp::benchmark_nmt_model(&context);
+  }
+  /*
+  {
+    gemmlowp::GemmContext context;
     std::cout << "Benchmarking small model GEMMs..." << std::endl;
+    std::cout << "TEST DEBUG LOG" << std::endl;
     gemmlowp::benchmark_small_model(&context);
   }
 
@@ -360,6 +400,7 @@ void benchmark_all() {
     std::cout << "Benchmarking single-threaded mode..." << std::endl;
     gemmlowp::benchmark(&context);
   }
+  */
 }
 
 }  // end namespace gemmlowp

@@ -21,6 +21,7 @@
 #include "../public/bit_depth.h"
 #include "common.h"
 #include "kernel_reference.h"
+#include <iostream>
 
 namespace gemmlowp {
 
@@ -85,6 +86,7 @@ GEMMLOWP_SET_DEFAULT_KERNEL(false, false, SSE4_64_Kernel12x4Depth2)
 GEMMLOWP_SET_DEFAULT_KERNEL(false, false, AVX2_64_Kernel24x8Depth2)
 #else
 #include "kernel_reference.h"
+std::cout << "BUILDING WITH REFERENCE KERNEL" << std::endl;
 namespace gemmlowp {
 typedef ReferenceKernel<KernelFormat<
     KernelSideFormat<CellFormat<4, 16, CellOrder::WidthMajor>, 1>,

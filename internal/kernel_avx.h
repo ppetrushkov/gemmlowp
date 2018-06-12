@@ -24,6 +24,7 @@
 
 #include <string.h>
 #include <cassert>
+#include <iostream>
 
 namespace gemmlowp {
 
@@ -38,6 +39,7 @@ struct AVX2_64_Kernel24x8Depth2 : KernelBase {
   void Run(std::int32_t *dst_ptr, std::size_t dst_row_stride, std::size_t dst_col_stride,
            const std::uint8_t *lhs_ptr, const std::uint8_t *rhs_ptr, std::size_t start_depth,
            std::size_t run_depth) const override {
+    std::cout << "AVX KERNEL" << std::endl;
     ScopedProfilingLabel label("optimized kernel");
     assert(dst_row_stride == 1);
     const std::int64_t run_depth_cells = run_depth / Format::kDepth;
